@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://www.flowable.org/processdef">
+
+    <process id="leave-approval" name="请假审批流程" isExecutable="true">
+
+        <documentation>员工请假审批流程：≤3天直线主管审批，>3天部门经理审批</documentation>
+
+        <startEvent id="start" name="开始">
+            <outgoing>flow_start_to_fill</outgoing>
+        </startEvent>
+
+        <userTask id="fillForm" name="填写请假申请" flowable:assignee="${initiator}"
+                  flowable:formFieldValidation="true">
+            <documentation>填写请假天数、类型、理由</documentation>
+            <extensionElements>
+                <flowable:formProperty id="leaveType" name="请假类型" type="string" required="true">
+                    <flowable:value id="annual" name="年假"/>
+                    <flowable:value id="sick" name="病假"/>
+                    <flowable:value id="personal" name="事假"/>
+                </flowable:formProperty>
+                <flowable:formProperty id="leaveDays" name="请假天数" type="long" required="true"/>
+                <flowable:formProperty id="reason" name="请假理由" type="string" required="true"/>
+            </extensionElements>
+            <incoming>flow_start_to_fill</incoming>
+            <outgoing>flow_fill_to_gateway</outgoing>
+        </userTask>
+
+        <exclusiveGateway id="approvalGateway" name="审批分支">
+            <incoming>flow_fill_to_gateway</incoming>
+            <outgoing>flow_to_lineManager</outgoing>
+            <outgoing>flow_to_deptManager</outgoing>
+        </exclusiveGateway>
+
+        <sequenceFlow id="flow_start_to_fill" sourceRef="start" targetRef="fillForm"/>
+
+        <sequenceFlow id="flow_fill_to_gateway" sourceRef="fillForm" targetRef="approvalGateway"/>
+
+        <sequenceFlow id="flow_to_lineManager" name="≤3天" sourceRef="approvalGateway" targetRef="lineManagerApproval">
+            <conditionExpression xsi:type="tFormalExpression"
+                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                ${leaveDays &lt;= 3}
+            </conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="flow_to_deptManager" name=">3天" sourceRef="approvalGateway" targetRef="deptManagerApproval">
+            <conditionExpression xsi:type="tFormalExpression"
+                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                ${leaveDays > 3}
+            </conditionExpression>
+        </sequenceFlow>
+
+        <userTask id="lineManagerApproval" name="直线主管审批"
+                  flowable:assignee="${lineManager}"
+                  flowable:candidateGroups="lineManager">
+            <documentation>≤3天由直线主管审批</documentation>
+            <extensionElements>
+                <flowable:formProperty id="approvalComment" name="审批意见" type="string"/>
+                <flowable:formProperty id="approved" name="是否通过" type="boolean" required="true"/>
+            </extensionElements>
+            <incoming>flow_to_lineManager</incoming>
+            <outgoing>flow_lineManager_to_update</outgoing>
+        </userTask>
+
+        <userTask id="deptManagerApproval" name="部门经理审批"
+                  flowable:assignee="${deptManager}"
+                  flowable:candidateGroups="deptManager">
+            <documentation>>3天由部门经理审批</documentation>
+            <extensionElements>
+                <flowable:formProperty id="approvalComment" name="审批意见" type="string"/>
+                <flowable:formProperty id="approved" name="是否通过" type="boolean" required="true"/>
+            </extensionElements>
+            <incoming>flow_to_deptManager</incoming>
+            <outgoing>flow_deptManager_to_update</outgoing>
+        </userTask>
+
+        <sequenceFlow id="flow_lineManager_to_update" sourceRef="lineManagerApproval" targetRef="updateRecord"/>
+        <sequenceFlow id="flow_deptManager_to_update" sourceRef="deptManagerApproval" targetRef="updateRecord"/>
+
+        <serviceTask id="updateRecord" name="更新请假记录"
+                     flowable:delegateExpression="${approvalService}"
+                     flowable:async="false">
+            <incoming>flow_lineManager_to_update</incoming>
+            <incoming>flow_deptManager_to_update</incoming>
+            <outgoing>flow_update_to_end</outgoing>
+        </serviceTask>
+
+        <sequenceFlow id="flow_update_to_end" sourceRef="updateRecord" targetRef="end"/>
+
+        <endEvent id="end" name="结束">
+            <incoming>flow_update_to_end</incoming>
+        </endEvent>
+
+    </process>
+
+    <!-- 流程图可视化定义 -->
+    <bpmndi:BPMNDiagram id="BPMNDiagram_leaveApproval">
+        <bpmndi:BPMNPlane id="BPMNPlane_leaveApproval" bpmnElement="leave-approval">
+            <bpmndi:BPMNShape id="shape_start" bpmnElement="start">
+                <omgdc:Bounds x="160" y="80" width="30" height="30"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_fillForm" bpmnElement="fillForm">
+                <omgdc:Bounds x="135" y="160" width="80" height="60"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_gateway" bpmnElement="approvalGateway">
+                <omgdc:Bounds x="160" y="270" width="30" height="30"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_lineManager" bpmnElement="lineManagerApproval">
+                <omgdc:Bounds x="60" y="350" width="80" height="60"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_deptManager" bpmnElement="deptManagerApproval">
+                <omgdc:Bounds x="210" y="350" width="80" height="60"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_update" bpmnElement="updateRecord">
+                <omgdc:Bounds x="135" y="460" width="80" height="60"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNShape id="shape_end" bpmnElement="end">
+                <omgdc:Bounds x="160" y="570" width="30" height="30"/>
+            </bpmndi:BPMNShape>
+            <bpmndi:BPMNEdge id="edge_start_fill" bpmnElement="flow_start_to_fill">
+                <omgdi:waypoint x="175" y="110"/>
+                <omgdi:waypoint x="175" y="160"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_fill_gateway" bpmnElement="flow_fill_to_gateway">
+                <omgdi:waypoint x="175" y="220"/>
+                <omgdi:waypoint x="175" y="270"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_gateway_line" bpmnElement="flow_to_lineManager">
+                <omgdi:waypoint x="175" y="300"/>
+                <omgdi:waypoint x="100" y="350"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_gateway_dept" bpmnElement="flow_to_deptManager">
+                <omgdi:waypoint x="175" y="300"/>
+                <omgdi:waypoint x="250" y="350"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_line_update" bpmnElement="flow_lineManager_to_update">
+                <omgdi:waypoint x="100" y="410"/>
+                <omgdi:waypoint x="175" y="460"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_dept_update" bpmnElement="flow_deptManager_to_update">
+                <omgdi:waypoint x="250" y="410"/>
+                <omgdi:waypoint x="175" y="460"/>
+            </bpmndi:BPMNEdge>
+            <bpmndi:BPMNEdge id="edge_update_end" bpmnElement="flow_update_to_end">
+                <omgdi:waypoint x="175" y="520"/>
+                <omgdi:waypoint x="175" y="570"/>
+            </bpmndi:BPMNEdge>
+        </bpmndi:BPMNPlane>
+    </bpmndi:BPMNDiagram>
+</definitions>

@@ -1,0 +1,111 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: crpi-27zlqugq2208c0pz.cn-hangzhou.personal.cr.aliyuncs.com/xiaofeiyang930112/mysql:8.0
+    container_name: flowable-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: flowable
+      MYSQL_USER: flowable
+      MYSQL_PASSWORD: flowable
+    ports:
+      - "53306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init-scripts:/docker-entrypoint-initdb.d/
+      - ./mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+
+  nacos:
+    image: crpi-27zlqugq2208c0pz.cn-hangzhou.personal.cr.aliyuncs.com/xiaofeiyang930112/nacos-server:v2.5.1
+    container_name: nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+
+  flowable-server:
+    build:
+      context: ./flowable-work
+      dockerfile: Dockerfile
+    container_name: flowable-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: flowable
+      MYSQL_USER: flowable
+      MYSQL_PASSWORD: flowable
+      NACOS_HOST: nacos
+      REDIS_HOST: redis
+    ports:
+      - "58080:8080"
+
+  flowable-ui:
+    build:
+      context: ./flowable-work-ui
+      dockerfile: Dockerfile
+    container_name: flowable-ui
+    restart: unless-stopped
+    depends_on:
+      - flowable-server
+    ports:
+      - "58081:80"
+
+  user-center:
+    build:
+      context: ./user-center
+      dockerfile: Dockerfile
+    container_name: user-center
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: flowable
+      MYSQL_PASSWORD: flowable
+      NACOS_HOST: nacos
+      REDIS_HOST: redis
+    ports:
+      - "58082:8081"
+
+  user-center-ui:
+    build:
+      context: ./user-center-ui
+      dockerfile: Dockerfile
+    container_name: user-center-ui
+    restart: unless-stopped
+    depends_on:
+      - user-center
+    ports:
+      - "58083:80"
+
+volumes:
+  mysql-data:
