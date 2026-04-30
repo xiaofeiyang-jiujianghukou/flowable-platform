@@ -2,86 +2,55 @@
 
 基于 **Flowable 8 + Spring Boot 4 + JDK 25** 的企业级工作流管理平台。
 
-## 技术栈
-
-| 组件 | 版本 |
-|------|------|
-| Java | 25 |
-| Spring Boot | 4.0.2 |
-| Flowable | 8.0.0 |
-| MySQL | 8.0 |
-| Docker | 28+ |
-
-## 项目结构
-
-```
-flowable-platform/
-├── docker-compose.yml      # 容器编排
-├── init.sql                 # 业务表初始化
-├── 项目设计文档.md          # 设计文档
-└── flowable-work/           # Spring Boot 后端
-    ├── pom.xml
-    ├── Dockerfile
-    └── src/main/
-        ├── java/com/flowable/platform/
-        │   ├── FlowablePlatformApplication.java
-        │   ├── config/FlowableConfig.java
-        │   ├── listener/ProcessEventListener.java
-        │   └── service/ApprovalService.java
-        └── resources/
-            ├── application.yml
-            ├── processes/leave-approval.bpmn20.xml
-            └── static/ext/
-                ├── custom.css
-                └── custom.js
-```
-
 ## 快速启动
-
-### 1. 启动 MySQL + Flowable
 
 ```bash
 docker compose up -d
 ```
 
-### 2. 启动开发模式（H2 内存数据库）
+## 访问地址
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| 流程设计器 | http://localhost:58081 | BPMN/CMMN/DMN 建模 |
+| 流程引擎 Swagger | http://localhost:58080/swagger-ui.html | REST API 文档 |
+| 用户中心 | http://localhost:58083 | 用户/部门/角色/审批管理 |
+| 用户中心 Swagger | http://localhost:58082/swagger-ui.html | REST API 文档 |
+| Nacos | http://localhost:8848/nacos | nacos/nacos |
+
+## 默认账号
+
+所有用户密码均为 `123456`
+
+| 用户名 | 角色 | 权限 |
+|--------|------|------|
+| admin | 管理员 | 全部菜单 |
+| zhangsan | 直线主管 | 用户管理、审批管理 |
+
+## 开发
 
 ```bash
-cd flowable-work
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# 流程引擎
+cd flowable-work && mvn spring-boot:run
+
+# 流程设计器
+cd flowable-work-ui && npm run dev
+
+# 用户中心后端
+cd user-center && mvn spring-boot:run
+
+# 用户中心前端
+cd user-center-ui && npm run dev
 ```
 
-### 3. 访问服务
+## 项目结构
 
-- 后端 REST API: http://localhost:8080/flowable-rest
-- H2 Console（开发模式）: http://localhost:8080/h2-console
-- Actuator: http://localhost:8080/actuator
-
-## REST API
-
-Flowable 引擎提供完整的 REST API：
-
-| 模块 | 路径 | 说明 |
-|------|------|------|
-| 流程定义 | `/flowable-rest/service/repository/process-definitions` | 流程定义管理 |
-| 流程实例 | `/flowable-rest/service/runtime/process-instances` | 启动/查询流程实例 |
-| 任务 | `/flowable-rest/service/runtime/tasks` | 待办/完成任务 |
-| 历史 | `/flowable-rest/service/history/process-instances` | 历史数据查询 |
-| DMN | `/flowable-rest/service/dmn/repository/decision-definitions` | 决策表管理 |
-
-## 示例流程
-
-请假审批流程（`leave-approval`）：
-
-- 员工填写请假申请 → ≤3天由直线主管审批，>3天由部门经理审批 → 更新记录
-- 自动部署到 Flowable 引擎，启动后在 API 中可查看
-
-## 部署
-
-```bash
-# 构建
-cd flowable-work && mvn clean package -DskipTests
-
-# Docker 启动全部服务
-cd .. && docker compose up -d --build
+```
+flowable-platform/
+├── flowable-work/           # 流程引擎 Spring Boot
+├── flowable-work-ui/        # 流程设计器 Vue + bpmn-js
+├── user-center/             # 用户中心 Spring Boot + MyBatis-Plus
+├── user-center-ui/          # 用户中心前端 Vue + Element Plus
+├── mysql/init-scripts/      # 数据库初始化
+└── docker-compose.yml       # 容器编排
 ```
